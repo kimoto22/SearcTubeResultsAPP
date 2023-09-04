@@ -1,5 +1,5 @@
 import tkinter as tk
-from tkinter import ttk, filedialog
+from tkinter import ttk, filedialog, messagebox
 import threading
 import cv2
 import numpy as np
@@ -14,23 +14,40 @@ class Config():
         self.h, self.w = np.array(pyautogui.screenshot()).shape[:2]
         self.frame_queue = []
         self.output_folder = ""
+        self.record_thread = None  # record_threadをここで初期化
+        self.mouse_thread = None  # mouse_threadをここで初期化
 
 class RecordThread():
     def __init__(self, config):
         self.config = config
 
-    def loop(self):
-        self.config.frame_queue = []
+    def draw_red_dot(self, img, x, y, radius=5):
+        # 赤い点のBGR色コード (B, G, R)
+        red_color = (0, 0, 255)
+
+        # 円を描画
+        img = cv2.circle(img, (x, y), radius, red_color, -1)  # -1を指定すると塗りつぶしの円を描画します
+        return img
+
+    def get_mouse_position(self):
         while self.config.stop_flag != 1:
+            x, y = pyautogui.position()
             img = pyautogui.screenshot()
             img = np.array(img)
             img = cv2.cvtColor(img, cv2.COLOR_RGB2BGR)
+            img = self.draw_red_dot(img, x, y)
             self.config.frame_queue.append(img)
+
+    def loop(self):
+        self.config.frame_queue = []
+        self.config.mouse_thread = threading.Thread(target=self.get_mouse_position)
+        self.config.mouse_thread.start()
 
 class CaptureApp(tk.Tk):
     def __init__(self):
         super().__init__()
         self.config = Config()
+        self.config.record_thread = None  # record_threadをここで初期化
 
         self.title("Screen Capture")
         self.geometry("300x150")
@@ -56,24 +73,27 @@ class CaptureApp(tk.Tk):
 
     def record_start(self):
         if not self.config.output_folder:
-            tk.messagebox.showerror("Error", "Please select an output folder.")
+            messagebox.showerror("Error", "Please select an output folder.")
             return
 
         if self.config.start_flag == 0:
             self.config.start_flag = 1
-            self.record_thread = threading.Thread(target=self.record_control)
-            self.record_thread.start()
+            self.config.record_thread = threading.Thread(target=self.record_control)
+            self.config.record_thread.start()
 
     def record_stop(self):
         if self.config.start_flag == 1:
             self.config.stop_flag = 1
-            self.record_thread.join()
+            if self.config.record_thread is not None:
+                self.config.record_thread.join()
+            if self.config.mouse_thread is not None:
+                self.config.mouse_thread.join()
             self.record_save()
             self.update_output_folder_label()
             self.config.stop_flag = 0
             self.config.start_flag = 0
         else:
-            tk.messagebox.showerror("Error", "Please start recording first.")
+            messagebox.showerror("Error", "Please start recording first.")
 
     def record_control(self):
         rec = RecordThread(self.config)
@@ -87,7 +107,7 @@ class CaptureApp(tk.Tk):
             for frame in self.config.frame_queue:
                 video.write(frame)
             video.release()
-            tk.messagebox.showinfo("Info", "Video saved successfully.")
+            messagebox.showinfo("Info", "Video saved successfully.")
 
     def select_output_folder(self):
         self.config.output_folder = filedialog.askdirectory()
