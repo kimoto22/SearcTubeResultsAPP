@@ -4,50 +4,61 @@ import threading
 import cv2
 import numpy as np
 import pyautogui
+from pynput.mouse import Listener
+import time
+import csv
+import os
 
 class Config():
     def __init__(self):
         self.start_flag = 0
         self.stop_flag = 0
         self.fps = 15
-        self.m_time = 10
         self.h, self.w = np.array(pyautogui.screenshot()).shape[:2]
         self.frame_queue = []
         self.output_folder = ""
-        self.record_thread = None  # record_threadをここで初期化
-        self.mouse_thread = None  # mouse_threadをここで初期化
+        self.record_thread = None
+        self.click_timestamps = []
 
-class RecordThread():
+class RecordThread(threading.Thread):
     def __init__(self, config):
+        super().__init__()
         self.config = config
+        self.stop_thread = threading.Event()
 
     def draw_red_dot(self, img, x, y, radius=5):
-        # 赤い点のBGR色コード (B, G, R)
         red_color = (0, 0, 255)
-
-        # 円を描画
-        img = cv2.circle(img, (x, y), radius, red_color, -1)  # -1を指定すると塗りつぶしの円を描画します
+        img = cv2.circle(img, (x, y), radius, red_color, -1)
         return img
 
     def get_mouse_position(self):
-        while self.config.stop_flag != 1:
-            x, y = pyautogui.position()
+        with Listener(on_click=self.on_click) as listener:
+            listener.join()
+
+    def on_click(self, x, y, button, pressed):
+        if pressed:
+            timestamp = time.time()
+            microseconds = int((timestamp - int(timestamp)) * 1e6)
+            timestamp_str = time.strftime("%H_%M_%S", time.localtime(timestamp)) + f"_{microseconds:06d}"
+            self.config.click_timestamps.append(timestamp_str)
             img = pyautogui.screenshot()
             img = np.array(img)
             img = cv2.cvtColor(img, cv2.COLOR_RGB2BGR)
             img = self.draw_red_dot(img, x, y)
             self.config.frame_queue.append(img)
 
-    def loop(self):
+    def run(self):
         self.config.frame_queue = []
-        self.config.mouse_thread = threading.Thread(target=self.get_mouse_position)
-        self.config.mouse_thread.start()
+        self.get_mouse_position()
+
+    def stop(self):
+        self.stop_thread.set()
 
 class CaptureApp(tk.Tk):
     def __init__(self):
         super().__init__()
         self.config = Config()
-        self.config.record_thread = None  # record_threadをここで初期化
+        self.config.record_thread = None
 
         self.title("Screen Capture")
         self.geometry("300x150")
@@ -78,26 +89,20 @@ class CaptureApp(tk.Tk):
 
         if self.config.start_flag == 0:
             self.config.start_flag = 1
-            self.config.record_thread = threading.Thread(target=self.record_control)
+            self.config.record_thread = RecordThread(self.config)
             self.config.record_thread.start()
 
     def record_stop(self):
         if self.config.start_flag == 1:
             self.config.stop_flag = 1
             if self.config.record_thread is not None:
-                self.config.record_thread.join()
-            if self.config.mouse_thread is not None:
-                self.config.mouse_thread.join()
+                self.config.record_thread.stop()
             self.record_save()
             self.update_output_folder_label()
             self.config.stop_flag = 0
             self.config.start_flag = 0
         else:
             messagebox.showerror("Error", "Please start recording first.")
-
-    def record_control(self):
-        rec = RecordThread(self.config)
-        rec.loop()
 
     def record_save(self):
         save_path = filedialog.asksaveasfilename(defaultextension=".mp4", filetypes=[("MP4 files", "*.mp4")])
@@ -108,6 +113,13 @@ class CaptureApp(tk.Tk):
                 video.write(frame)
             video.release()
             messagebox.showinfo("Info", "Video saved successfully.")
+
+            if self.config.click_timestamps:
+                csv_file_path = os.path.join(self.config.output_folder, 'click_timestamps.csv')
+                with open(csv_file_path, 'w', newline='') as csvfile:
+                    writer = csv.writer(csvfile)
+                    for timestamp in self.config.click_timestamps:
+                        writer.writerow([timestamp])
 
     def select_output_folder(self):
         self.config.output_folder = filedialog.askdirectory()
