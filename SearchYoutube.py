@@ -6,7 +6,7 @@ import numpy as np
 import pyautogui
 from pynput.mouse import Listener
 import time
-import csv
+import pandas as pd
 import os
 
 class Config():
@@ -125,11 +125,13 @@ class CaptureApp(tk.Tk):
         messagebox.showinfo("Info", "Video saved successfully.")
 
         if self.config.click_timestamps:
+            # Create a Pandas DataFrame from the timestamps
+            data = {'Timestamps': self.config.click_timestamps}
+            df = pd.DataFrame(data)
+            
+            # Save the DataFrame to a CSV file
             csv_file_path = os.path.join(self.config.output_folder, self.config.video_name.replace(".mp4", ".csv"))
-            with open(csv_file_path, 'w', newline='') as csvfile:
-                writer = csv.writer(csvfile)
-                for timestamp in self.config.click_timestamps:
-                    writer.writerow([timestamp])
+            df.to_csv(csv_file_path, index=False)
 
     def select_output_folder(self):
         self.config.output_folder = filedialog.askdirectory()
