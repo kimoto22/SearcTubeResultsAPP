@@ -26,6 +26,9 @@ class RecordThread(threading.Thread):
         super().__init__()
         self.config = config
         self.stop_thread = threading.Event()
+        self.video_writer = None  # ビデオライターを初期化
+        self.click_count_font = cv2.FONT_HERSHEY_SIMPLEX
+        self.click_count_position = (self.config.w - 150, 30)  # クリック回数の表示位置
 
     def draw_red_dot(self, img, x, y, radius=5):
         red_color = (0, 0, 255)
@@ -43,7 +46,15 @@ class RecordThread(threading.Thread):
                     img = cv2.cvtColor(np.array(img), cv2.COLOR_RGB2BGR)
                     x, y = pyautogui.position()
                     img = self.draw_red_dot(img, x, y)
+
+                    # クリック回数をテキストでフレームに描画
+                    click_count_text = f"Clicks: {len(self.config.click_timestamps)}"
+                    cv2.putText(img, click_count_text, self.click_count_position, self.click_count_font, 1, (0, 0, 255), 2)
+
                     self.config.frame_queue.append(img)
+
+                    if self.video_writer is not None:
+                        self.video_writer.write(img)  # ビデオにフレームを書き込む
 
     def on_click(self, x, y, button, pressed):
         if pressed:
@@ -54,10 +65,15 @@ class RecordThread(threading.Thread):
 
     def run(self):
         self.config.frame_queue = []
+        save_path = os.path.join(self.config.output_folder, self.config.video_name)
+        fourcc = cv2.VideoWriter_fourcc(*'mp4v')
+        self.video_writer = cv2.VideoWriter(save_path, fourcc, self.config.fps, (self.config.w, self.config.h))
         self.get_mouse_position()
 
     def stop(self):
         self.stop_thread.set()
+        if self.video_writer is not None:
+            self.video_writer.release()  # ビデオライターを解放
 
 class CaptureApp(tk.Tk):
     def __init__(self):
@@ -108,30 +124,11 @@ class CaptureApp(tk.Tk):
             self.config.stop_flag = 1
             if self.config.record_thread is not None:
                 self.config.record_thread.stop()
-            self.record_save()
             self.update_output_folder_label()
             self.config.stop_flag = 0
             self.config.start_flag = 0
         else:
             messagebox.showerror("Error", "Please start recording first.")
-
-    def record_save(self):
-        save_path = os.path.join(self.config.output_folder, self.config.video_name)
-        fourcc = cv2.VideoWriter_fourcc('m', 'p', '4', 'v')
-        video = cv2.VideoWriter(save_path, fourcc, self.config.fps, (self.config.w, self.config.h))
-        for frame in self.config.frame_queue:
-            video.write(frame)
-        video.release()
-        messagebox.showinfo("Info", "Video saved successfully.")
-
-        if self.config.click_timestamps:
-            # Create a Pandas DataFrame from the timestamps
-            data = {'Timestamps': self.config.click_timestamps}
-            df = pd.DataFrame(data)
-            
-            # Save the DataFrame to a CSV file
-            csv_file_path = os.path.join(self.config.output_folder, self.config.video_name.replace(".mp4", ".csv"))
-            df.to_csv(csv_file_path, index=False)
 
     def select_output_folder(self):
         self.config.output_folder = filedialog.askdirectory()
