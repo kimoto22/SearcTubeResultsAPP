@@ -1,15 +1,16 @@
+# main.py
 import tkinter as tk
 from tkinter import ttk, filedialog, messagebox
 import threading
 import os
 
-# cameraモジュールからCameraクラスをインポート
-from camera import Camera
+# Capture
+from capture import Capture
 
 class CaptureApp(tk.Tk):
     def __init__(self):
         super().__init__()
-        self.config = Camera()  # Cameraクラスのインスタンスを作成
+        self.config = Capture()  # Captureクラスのインスタンスを作成
 
         self.title("Screen Capture")
         self.geometry("300x400")
@@ -49,12 +50,18 @@ class CaptureApp(tk.Tk):
             self.config.start_flag = 1
             self.config.record_thread = threading.Thread(target=self.config.record)
             self.config.record_thread.start()
+        
+            # カメラキャプチャを開始
+            self.config.camera_thread = threading.Thread(target=self.config.capture_frames, args=(self.csv_entry.get(),))  # 引数を追加
+            self.config.camera_thread.start()
 
     def record_stop(self):
         if self.config.start_flag == 1:
             self.config.stop_flag = 1
             if self.config.record_thread is not None:
                 self.config.record_thread.join()
+                self.config.camera_thread.join()
+                
             self.update_output_folder_label()
             self.config.stop_flag = 0
             self.config.start_flag = 0

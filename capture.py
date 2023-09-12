@@ -1,3 +1,4 @@
+# capture.py
 import cv2
 import numpy as np
 import pyautogui
@@ -7,7 +8,7 @@ import os
 import threading
 import pandas as pd
 
-class Camera:
+class Capture:
     def __init__(self):
         self.start_flag = 0
         self.stop_flag = 0
@@ -67,3 +68,29 @@ class Camera:
         self.get_mouse_position()
         self.video_writer.release()
         self.save_click_timestamps()
+    
+    # カメラキャプチャを行う関数
+    def capture_frames(self, name):
+        camera_w = 1280
+        camera_h = 720
+
+        capture = cv2.VideoCapture(0)
+        capture.set(cv2.CAP_PROP_FRAME_WIDTH, camera_w)
+        capture.set(cv2.CAP_PROP_FRAME_HEIGHT, camera_h)
+
+        camera_fps = capture.get(cv2.CAP_PROP_FPS)
+
+        fourcc = cv2.VideoWriter_fourcc(*'XVID')
+        camera_video_name = f"{name}_PCカメラ映像.avi"
+        camera_video_path = os.path.join(self.output_folder, camera_video_name).replace("\\", "/")
+        camera_video_writer = cv2.VideoWriter(camera_video_path, fourcc, camera_fps, (camera_w, camera_h))
+
+        while not self.stop_flag:
+            ret, frame = capture.read()
+            if not ret:
+                break
+
+            camera_video_writer.write(frame)
+
+        capture.release()
+        camera_video_writer.release()
