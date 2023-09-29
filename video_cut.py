@@ -22,6 +22,10 @@ def cut_video_by_timestamp(csv_file, video_path, output_file, start_timestamp, e
     # ビデオの作成時刻を取得
     video_creation_time = get_video_creation_time(video_path)
 
+    # 日付部分をビデオの作成日に合わせる
+    start_time = start_time.replace(year=video_creation_time.year, month=video_creation_time.month, day=video_creation_time.day)
+    end_time = end_time.replace(year=video_creation_time.year, month=video_creation_time.month, day=video_creation_time.day)
+
     # ビデオ作成時刻に基づいて開始および終了時間を調整
     start_time = (start_time - video_creation_time).total_seconds()
     end_time = (end_time - video_creation_time).total_seconds()
