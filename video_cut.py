@@ -1,62 +1,58 @@
-import pandas as pd
-from moviepy.video.io.VideoFileClip import VideoFileClip
-import os
-from datetime import datetime, timedelta
-
-def get_video_creation_time(video_path):
-    # ビデオファイルの作成時刻を取得
-    created_time = os.path.getctime(video_path)
-    return datetime.fromtimestamp(created_time)
-
-def cut_video_by_timestamp(csv_file, video_path, output_file, start_timestamp, end_timestamp):
-    # pandas を使用してタイムスタンプが含まれる CSV ファイルを開く
-    timestamp_data = pd.read_csv(csv_file)
-
-    # タイムスタンプ文字列を datetime オブジェクトに変換
-    timestamp_data['Timestamp'] = pd.to_datetime(timestamp_data['Timestamp'])
-
-    # ビデオの切り取りのための開始および終了時間を取得
-    start_time = start_timestamp
-    end_time = end_timestamp
-
-    # ビデオの作成時刻を取得
-    video_creation_time = get_video_creation_time(video_path)
-
-    # 日付部分をビデオの作成日に合わせる
-    start_time = start_time.replace(year=video_creation_time.year, month=video_creation_time.month, day=video_creation_time.day)
-    end_time = end_time.replace(year=video_creation_time.year, month=video_creation_time.month, day=video_creation_time.day)
-
-    # ビデオ作成時刻に基づいて開始および終了時間を調整
-    start_time = (start_time - video_creation_time).total_seconds()
-    end_time = (end_time - video_creation_time).total_seconds()
-
-    # ビデオファイルを開く
-    video_clip = VideoFileClip(video_path)
-
-    # 指定されたタイムスタンプでビデオを切り取る
-    cut_video_clip = video_clip.subclip(start_time, end_time)
-
-    # 新しいファイルに切り取られたビデオを書き込む
-    cut_video_clip.write_videofile(output_file, codec="libx264", audio_codec="aac")
-
-    # ビデオクリップオブジェクトを閉じる
-    video_clip.close()
-    cut_video_clip.close()
-
-# 例：タイムスタンプの範囲を指定
-start_timestamp = pd.Timestamp("15:43:37.687518")
-end_timestamp = pd.Timestamp("15:43:40.136235")
+from moviepy.editor import VideoFileClip
+import cv2
+import datetime
 
 # 対象者の名前
 subject_name = "goto"
 
 # 切り取られたビデオファイルの名前
-cut_video_name = "focus"
+cut_video_name = "NotFocus"
 
 # CSV タイムスタンプログファイルとビデオファイルを指定
-csv_file = f".\\SearcTubeResultsAPP\\{subject_name}\\{subject_name}.csv"
-video_path = f".\\SearcTubeResultsAPP\\{subject_name}\\{subject_name}_PCカメラ映像.avi"
-output_file = f".\\SearcTubeResultsAPP\\{subject_name}\\{subject_name}_{cut_video_name}.avi"
+input_video_path = f".\\SearcTubeResultsAPP\\{subject_name}\\{subject_name}_PCカメラ映像.avi"
+output_video_path = f".\\SearcTubeResultsAPP\\{subject_name}\\{subject_name}_{cut_video_name}.mp4"
 
-# 切り取りを実行
-cut_video_by_timestamp(csv_file, video_path, output_file, start_timestamp, end_timestamp)
+# 手動で指定する開始時刻と終了時刻
+start_time_str = '15:43:43'
+end_time_str = '15:46:50'
+
+# 時刻文字列をdatetimeオブジェクトに変換します
+start_time = datetime.datetime.strptime(start_time_str, '%H:%M:%S')
+end_time = datetime.datetime.strptime(end_time_str, '%H:%M:%S')
+
+# 入力動画ファイルを開きます
+cap = cv2.VideoCapture(input_video_path)
+
+# 入力動画のフレームレートを取得します
+fps = int(cap.get(cv2.CAP_PROP_FPS))
+
+# 出力動画の設定
+fourcc = cv2.VideoWriter_fourcc(*'mp4v')  # 出力動画のコーデックを指定します
+out = cv2.VideoWriter(output_video_path, fourcc, fps,
+                      (int(cap.get(3)), int(cap.get(4))))
+
+# 指定した時刻の前にシークします
+while True:
+    ret, frame = cap.read()
+    if not ret:
+        break
+
+    # 現在のフレームの時刻を取得します
+    current_time = cap.get(cv2.CAP_PROP_POS_MSEC) / 1000.0
+
+    # 指定した時刻の前に到達したら、ループを抜けます
+    if current_time >= (start_time.hour * 3600 + start_time.minute * 60 + start_time.second):
+        break
+
+# 指定した時刻から指定した時刻までのフレームを書き込みます
+while True:
+    ret, frame = cap.read()
+    if not ret or current_time >= (end_time.hour * 3600 + end_time.minute * 60 + end_time.second):
+        break
+    out.write(frame)
+    current_time = cap.get(cv2.CAP_PROP_POS_MSEC) / 1000.0
+
+# クリーンアップ
+cap.release()
+out.release()
+cv2.destroyAllWindows()
