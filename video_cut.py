@@ -15,8 +15,6 @@ output_csv_path = f".\\subjects\\{subject_name}\\{subject_name}_TimeStamp.csv"
 csv_file_path = f".\\subjects\\{subject_name}\\{subject_name}.csv"
 csv_data = pd.read_csv(csv_file_path)
 
-GetFrameFlg = False
-
 start_time_str = "15:39:42.127503"
 end_time_str = "15:43:31.916475"
 
@@ -29,18 +27,6 @@ def output_HMS(time_str):
         HMS_time = time_str.strftime("%H:%M:%S.%f")
         HMS_time_without_milliseconds = HMS_time.split(".")[0]
     return HMS_time_without_milliseconds
-
-def count_time_list(start_time_str, end_time_str):
-    start_time = datetime.strptime(start_time_str, "%H:%M:%S.%f")
-    end_time = datetime.strptime(end_time_str, "%H:%M:%S.%f")
-    # 1秒ごとの時間リストを作成
-    time_list = []
-    current_time = start_time
-    while current_time <= end_time:
-        time_list.append(output_HMS(current_time))
-        current_time += timedelta(seconds=1)
-    return time_list
-
 
 def get_video_info(video_path):
     # OpenCVを使用して動画の情報を取得
@@ -66,7 +52,6 @@ def get_video_info(video_path):
     # キャプチャを解放
     cap.release()
 
-
 def save_frame_times_to_csv(video_path, output_csv_path):
     cap = cv2.VideoCapture(video_path)
     fps = cap.get(cv2.CAP_PROP_FPS)
@@ -76,12 +61,26 @@ def save_frame_times_to_csv(video_path, output_csv_path):
     for frame_number in range(int(cap.get(cv2.CAP_PROP_FRAME_COUNT))):
         current_time = datetime.fromtimestamp(os.path.getctime(video_path))
         frame_time = current_time + timedelta(seconds=frame_number / fps)
-        frame_times.append({'frame': frame_number + 1, 'time': frame_time})
+        frame_times.append({'frame': frame_number + 1, 'time': output_HMS(frame_time)})
 
     df = pd.DataFrame(frame_times)
     df.to_csv(output_csv_path, index=False)
 
     cap.release()
+
+
+def extract_frame_at_time(csv_path, target_time:str):
+    df = pd.read_csv(csv_path)
+    # 条件に一致する行を抽出
+    filtered_df = df[df['time'] == target_time]
+
+    # frame列を数値として扱うために文字列を整数に変換
+    filtered_df['frame'] = filtered_df['frame'].astype(int)
+
+    # frame列でソートし、最小のframe値を取得
+    nearest_frame = filtered_df.sort_values(by='frame').iloc[0]['frame']
+
+    return nearest_frame
 
 
 def extract_frames(input_video_path, output_video_path, start_frame, end_frame):
@@ -103,6 +102,13 @@ def extract_frames(input_video_path, output_video_path, start_frame, end_frame):
 
 # 動画の情報を表示
 get_video_info(input_video_path)
-# 動画の各フレームの時刻をテキストファイルに出力
+# 動画の各フレームの時刻をcsvファイルに出力
 save_frame_times_to_csv(input_video_path, output_csv_path)
 
+# 動画の各フレームのstarttime,　endtimeのframe_numberを抜き出し
+start_frame = extract_frame_at_time(output_csv_path, output_HMS(start_time_str))
+end_frame = extract_frame_at_time(output_csv_path, output_HMS(end_time_str))
+print(start_frame, end_frame)
+
+# 動画切り取り
+# extract_frames(input_video_path, output_video_path, start_frame, end_frame)
