@@ -92,13 +92,15 @@ def extract_frames(input_video_path, output_video_path, start_frame, end_frame):
     fps = int(cap.get(cv2.CAP_PROP_FPS))
     frame_size = int(cap.get(3)), int(cap.get(4))
     out = cv2.VideoWriter(output_video_path, fourcc, fps, frame_size)
-
+    print("動画の切り取りが始まりました")
     for frame_number in range(start_frame, end_frame):
         cap.set(cv2.CAP_PROP_POS_FRAMES, frame_number)  # 切り出すフレームに移動
         ret, frame = cap.read()  # フレームを読み込む
+        print("現在書き込んでいるframe:", frame_number)
         if not ret:
             break
         out.write(frame)  # フレームを出力動画に書き込む
+    print("動画の切り取りが終わりました")
 
 # 動画の情報を表示
 get_video_info(input_video_path)
@@ -111,4 +113,4 @@ end_frame = extract_frame_at_time(output_csv_path, output_HMS(end_time_str))
 print(start_frame, end_frame)
 
 # 動画切り取り
-# extract_frames(input_video_path, output_video_path, start_frame, end_frame)
+extract_frames(input_video_path, output_video_path, start_frame, end_frame)
