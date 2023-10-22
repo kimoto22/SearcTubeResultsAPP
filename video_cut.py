@@ -2,11 +2,12 @@ import cv2
 import os
 from datetime import datetime, timedelta
 import pandas as pd
+from moviepy.editor import VideoFileClip
 
 # 対象者の名前
 subject_name = "goto"
 
-mode_name = "集中"
+mode_name = "非集中"
 
 # 動画ファイルのパスを構築
 input_video_path = f".\\subjects\\{subject_name}\\{subject_name}_PCカメラ映像.avi"
@@ -15,8 +16,8 @@ output_csv_path = f".\\subjects\\{subject_name}\\{subject_name}_TimeStamp.csv"
 csv_file_path = f".\\subjects\\{subject_name}\\{subject_name}.csv"
 csv_data = pd.read_csv(csv_file_path)
 
-start_time_str = "15:39:42.127503"
-end_time_str = "15:43:31.916475"
+start_time_str = "15:43:43.429047"
+end_time_str = "15:46:50.332369"
 
 def output_HMS(time_str):
     try:
@@ -28,45 +29,42 @@ def output_HMS(time_str):
         HMS_time_without_milliseconds = HMS_time.split(".")[0]
     return HMS_time_without_milliseconds
 
+
+# 動画ファイルから作成日時、更新日時、およびフレーム数を取得
 def get_video_info(video_path):
-    # OpenCVを使用して動画の情報を取得
-    cap = cv2.VideoCapture(video_path)
-
-    # 動画の総フレーム数を取得
-    total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
-
-    # 動画のFPS（フレームレート）を取得
-    fps = cap.get(cv2.CAP_PROP_FPS)
-
-    # 動画の総時間を計算
-    total_seconds = total_frames / fps
-
-    # 動画の作成時刻と終了時刻を計算
-    creation_time = datetime.fromtimestamp(os.path.getctime(video_path))
-    end_time = creation_time + timedelta(seconds=total_seconds)
-
+    clip = VideoFileClip(video_path)
+    video_creation_time = os.path.getctime(video_path)
+    Video_end_time = os.path.getmtime(video_path)
+    total_frames = int(clip.reader.nframes)
+    
     # フォーマットして表示
-    print(f"動画作成時刻: {creation_time}")
-    print(f"動画終了時刻: {end_time}")
+    print(f"動画作成時刻: {video_creation_time}")
+    print(f"動画終了時刻: {Video_end_time}")
+    print(f"動画の総フレーム: {total_frames}")
+    return video_creation_time, Video_end_time, total_frames
 
-    # キャプチャを解放
-    cap.release()
 
-def save_frame_times_to_csv(video_path, output_csv_path):
-    cap = cv2.VideoCapture(video_path)
-    fps = cap.get(cv2.CAP_PROP_FPS)
+# 動画の継続時間と再生速度を計算
+def save_frame_times_to_csv(video_creation_time, Video_end_time, total_frames, output_csv_path):
+    # 動画の開始日時と終了日時を正しい日時オブジェクトに変換
+    creation_time = datetime.fromtimestamp(video_creation_time)
+    end_time = datetime.fromtimestamp(Video_end_time)
+    
+    # 動画の継続時間を計算（秒単位）
+    duration_seconds = (end_time - creation_time).total_seconds()
 
+    # 動画の再生速度（フレーム/秒）を計算
+    frame_rate = total_frames / duration_seconds
+
+    # 動画の開始時刻
+    start_time = creation_time
     frame_times = []
-
-    for frame_number in range(int(cap.get(cv2.CAP_PROP_FRAME_COUNT))):
-        current_time = datetime.fromtimestamp(os.path.getctime(video_path))
-        frame_time = current_time + timedelta(seconds=frame_number / fps)
+    # 各フレームの時刻を算出
+    for frame_number in range(total_frames):
+        frame_time = start_time + timedelta(seconds=frame_number / frame_rate)
         frame_times.append({'frame': frame_number + 1, 'time': output_HMS(frame_time)})
-
     df = pd.DataFrame(frame_times)
     df.to_csv(output_csv_path, index=False)
-
-    cap.release()
 
 
 def extract_frame_at_time(csv_path, target_time:str):
@@ -103,9 +101,9 @@ def extract_frames(input_video_path, output_video_path, start_frame, end_frame):
     print("動画の切り取りが終わりました")
 
 # 動画の情報を表示
-get_video_info(input_video_path)
+video_creation_time, Video_end_time, total_frames = get_video_info(input_video_path)
 # 動画の各フレームの時刻をcsvファイルに出力
-save_frame_times_to_csv(input_video_path, output_csv_path)
+save_frame_times_to_csv(video_creation_time, Video_end_time, total_frames, output_csv_path)
 
 # 動画の各フレームのstarttime,　endtimeのframe_numberを抜き出し
 start_frame = extract_frame_at_time(output_csv_path, output_HMS(start_time_str))
