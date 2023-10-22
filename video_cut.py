@@ -11,7 +11,7 @@ mode_name = "集中"
 # 動画ファイルのパスを構築
 input_video_path = f".\\subjects\\{subject_name}\\{subject_name}_PCカメラ映像.avi"
 output_video_path = f".\\subjects\\{subject_name}\\{subject_name}_{mode_name}.avi"
-output_txt_path = f".\\subjects\\{subject_name}\\{subject_name}_TimeStamp.txt"
+output_csv_path = f".\\subjects\\{subject_name}\\{subject_name}_TimeStamp.csv"
 csv_file_path = f".\\subjects\\{subject_name}\\{subject_name}.csv"
 csv_data = pd.read_csv(csv_file_path)
 
@@ -67,25 +67,20 @@ def get_video_info(video_path):
     cap.release()
 
 
-def get_frame_times(video_path, output_txt_path):
-    # OpenCVを使用して動画の情報を取得
+def save_frame_times_to_csv(video_path, output_csv_path):
     cap = cv2.VideoCapture(video_path)
-
-    # 動画のFPS（フレームレート）を取得
     fps = cap.get(cv2.CAP_PROP_FPS)
 
-    # ファイルを書き込みモードで開く
-    with open(output_txt_path, 'w') as file:
-        # 各フレームの時刻を取得して書き込む
-        for frame_number in range(int(cap.get(cv2.CAP_PROP_FRAME_COUNT))):
-            # フレーム番号から時刻を計算
-            current_time = datetime.fromtimestamp(os.path.getctime(video_path))
-            frame_time = current_time + timedelta(seconds=frame_number / fps)
+    frame_times = []
 
-            # フォーマットして書き込み
-            file.write(f"Frame {frame_number + 1}: {frame_time}\n")
+    for frame_number in range(int(cap.get(cv2.CAP_PROP_FRAME_COUNT))):
+        current_time = datetime.fromtimestamp(os.path.getctime(video_path))
+        frame_time = current_time + timedelta(seconds=frame_number / fps)
+        frame_times.append({'frame': frame_number + 1, 'time': frame_time})
 
-    # キャプチャを解放
+    df = pd.DataFrame(frame_times)
+    df.to_csv(output_csv_path, index=False)
+
     cap.release()
 
 
@@ -109,5 +104,5 @@ def extract_frames(input_video_path, output_video_path, start_frame, end_frame):
 # 動画の情報を表示
 get_video_info(input_video_path)
 # 動画の各フレームの時刻をテキストファイルに出力
-get_frame_times(input_video_path, output_txt_path)
+save_frame_times_to_csv(input_video_path, output_csv_path)
 
