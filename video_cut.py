@@ -6,36 +6,40 @@ import pandas as pd
 # 対象者の名前
 subject_name = "goto"
 
+mode_name = "集中"
+
 # 動画ファイルのパスを構築
-file_path = f".\\SearcTubeResultsAPP\\subjects\\{subject_name}\\{subject_name}_PCカメラ映像.avi"
-output_txt_path = f".\\SearcTubeResultsAPP\\sbjects\\{subject_name}\\{subject_name}_FrameTime.txt"
-csv_file_path = f".\\SearcTubeResultsAPP\\subjects\\{subject_name}\\{subject_name}.csv"
+input_video_path = f".\\subjects\\{subject_name}\\{subject_name}_PCカメラ映像.avi"
+output_video_path = f".\\subjects\\{subject_name}\\{subject_name}_{mode_name}.avi"
+output_txt_path = f".\\subjects\\{subject_name}\\{subject_name}_TimeStamp.txt"
+csv_file_path = f".\\subjects\\{subject_name}\\{subject_name}.csv"
 csv_data = pd.read_csv(csv_file_path)
 
+GetFrameFlg = False
+
+start_time_str = "15:39:42.127503"
+end_time_str = "15:43:31.916475"
 
 def output_HMS(time_str):
-    time = datetime.strptime(time_str, "%H:%M:%S.%f")
-    HMS_time = time.strftime("%H:%M:%S.%f")
-    HMS_time_without_milliseconds = HMS_time.split(".")[0]
+    try:
+        time = datetime.strptime(time_str, "%H:%M:%S.%f")
+        HMS_time = time.strftime("%H:%M:%S.%f")
+        HMS_time_without_milliseconds = HMS_time.split(".")[0]
+    except:
+        HMS_time = time_str.strftime("%H:%M:%S.%f")
+        HMS_time_without_milliseconds = HMS_time.split(".")[0]
     return HMS_time_without_milliseconds
 
-
-def read_csv(csv_data, frame_time):
-    start_time_str = "15:39:42.127503"
-    end_time_str = "15:43:31.916475"
-
-    HMS_start_time = output_HMS(start_time_str)
-    HMS_start_time = output_HMS(end_time_str)
-    HMS_frame_time = output_HMS(frame_time)
-
-    # Timestamp列の各アイテムを取り出す
-    for index, timestamp_item in csv_data['Timestamp'].iteritems():
-        HMS_timestamp = output_HMS(timestamp_item)
-
-        print(HMS_start_time, HMS_timestamp, HMS_frame_time)
-
-        if HMS_start_time == HMS_timestamp and HMS_start_time == HMS_frame_time:
-            print(HMS_start_time)
+def count_time_list(start_time_str, end_time_str):
+    start_time = datetime.strptime(start_time_str, "%H:%M:%S.%f")
+    end_time = datetime.strptime(end_time_str, "%H:%M:%S.%f")
+    # 1秒ごとの時間リストを作成
+    time_list = []
+    current_time = start_time
+    while current_time <= end_time:
+        time_list.append(output_HMS(current_time))
+        current_time += timedelta(seconds=1)
+    return time_list
 
 
 def get_video_info(video_path):
@@ -77,7 +81,6 @@ def get_frame_times(video_path, output_txt_path):
             # フレーム番号から時刻を計算
             current_time = datetime.fromtimestamp(os.path.getctime(video_path))
             frame_time = current_time + timedelta(seconds=frame_number / fps)
-            read_csv(csv_data, frame_time)
 
             # フォーマットして書き込み
             file.write(f"Frame {frame_number + 1}: {frame_time}\n")
@@ -86,7 +89,25 @@ def get_frame_times(video_path, output_txt_path):
     cap.release()
 
 
+def extract_frames(input_video_path, output_video_path, start_frame, end_frame):
+    # 動画ファイルを読み込む
+    cap = cv2.VideoCapture(input_video_path)
+
+    # 出力動画の設定
+    fourcc = cv2.VideoWriter_fourcc(*'XVID')
+    fps = int(cap.get(cv2.CAP_PROP_FPS))
+    frame_size = int(cap.get(3)), int(cap.get(4))
+    out = cv2.VideoWriter(output_video_path, fourcc, fps, frame_size)
+
+    for frame_number in range(start_frame, end_frame):
+        cap.set(cv2.CAP_PROP_POS_FRAMES, frame_number)  # 切り出すフレームに移動
+        ret, frame = cap.read()  # フレームを読み込む
+        if not ret:
+            break
+        out.write(frame)  # フレームを出力動画に書き込む
+
 # 動画の情報を表示
-get_video_info(file_path)
+get_video_info(input_video_path)
 # 動画の各フレームの時刻をテキストファイルに出力
-get_frame_times(file_path, output_txt_path)
+get_frame_times(input_video_path, output_txt_path)
+
