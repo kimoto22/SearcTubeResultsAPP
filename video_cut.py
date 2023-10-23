@@ -3,21 +3,24 @@ import os
 from datetime import datetime, timedelta
 import pandas as pd
 from moviepy.editor import VideoFileClip
+import tqdm
 
 # 対象者の名前
-subject_name = "goto"
+subject_name = "ichikawa"
 
 mode_name = "非集中"
 
 # 動画ファイルのパスを構築
 input_video_path = f".\\subjects\\{subject_name}\\{subject_name}_PCカメラ映像.avi"
 output_video_path = f".\\subjects\\{subject_name}\\{subject_name}_{mode_name}.avi"
-output_csv_path = f".\\subjects\\{subject_name}\\{subject_name}_TimeStamp.csv"
+output_csv_path = f".\\subjects\\{subject_name}\\{subject_name}_各フレームの時刻.csv"
 csv_file_path = f".\\subjects\\{subject_name}\\{subject_name}.csv"
 csv_data = pd.read_csv(csv_file_path)
 
-start_time_str = "15:43:43.429047"
-end_time_str = "15:46:50.332369"
+start_time_str = "16:47:28.825210"
+end_time_str = "16:50:39.786667"
+
+
 
 def output_HMS(time_str):
     try:
@@ -91,10 +94,10 @@ def extract_frames(input_video_path, output_video_path, start_frame, end_frame):
     frame_size = int(cap.get(3)), int(cap.get(4))
     out = cv2.VideoWriter(output_video_path, fourcc, fps, frame_size)
     print("動画の切り取りが始まりました")
-    for frame_number in range(start_frame, end_frame):
+    for frame_number in tqdm.tqdm(range(start_frame, end_frame)):
         cap.set(cv2.CAP_PROP_POS_FRAMES, frame_number)  # 切り出すフレームに移動
         ret, frame = cap.read()  # フレームを読み込む
-        print("現在書き込んでいるframe:", frame_number)
+        # print("現在書き込んでいるframe:", frame_number)
         if not ret:
             break
         out.write(frame)  # フレームを出力動画に書き込む
@@ -108,7 +111,8 @@ save_frame_times_to_csv(video_creation_time, Video_end_time, total_frames, outpu
 # 動画の各フレームのstarttime,　endtimeのframe_numberを抜き出し
 start_frame = extract_frame_at_time(output_csv_path, output_HMS(start_time_str))
 end_frame = extract_frame_at_time(output_csv_path, output_HMS(end_time_str))
-print(start_frame, end_frame)
+print(f"切り取り開始フレーム：{start_frame}")
+print(f"切り取り終了フレーム：{end_frame}")
 
 # 動画切り取り
 extract_frames(input_video_path, output_video_path, start_frame, end_frame)
